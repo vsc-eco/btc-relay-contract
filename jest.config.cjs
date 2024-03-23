@@ -12,7 +12,8 @@ module.exports = {
   },
   "moduleNameMapper": {
     "^(\\.{1,2}/.*)\\.js$": "$1",
-    sdk: "<rootDir>/empty.ts",
+    sdk: "<rootDir>/sdk-mock.ts",
+    env: "<rootDir>/env-mock.ts",
   },
   "transform": {
     "^.+\\.(t|j)s$": [
