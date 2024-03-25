@@ -1,26 +1,29 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
-  "moduleFileExtensions": ["js", "json", "ts"],
-  "testRegex": "tests/.*.ts$",
-  testPathIgnorePatterns: ["/node_modules/", "/tests/mocks.ts"],
-  "testEnvironment": "node",
-  "extensionsToTreatAsEsm": [".ts"],
-  "globals": {
+  moduleFileExtensions: ["js", "json", "ts"],
+  testRegex: "tests/.*.ts$",
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/tests/mocks.ts",
+    "/tests/debug.ts",
+  ],
+  testEnvironment: "node",
+  extensionsToTreatAsEsm: [".ts"],
+  globals: {
     "ts-jest": {
-      "useESM": true
-    }
+      useESM: true,
+    },
   },
-  "moduleNameMapper": {
+  moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
-    sdk: "<rootDir>/sdk-mock.ts",
-    env: "<rootDir>/env-mock.ts",
+    "^@@(.*)$": "<rootDir>$1",
   },
-  "transform": {
+  transform: {
     "^.+\\.(t|j)s$": [
       "@swc/jest",
       {
-        "root": "../.."
-      }
-    ]
-  }
+        root: "../..",
+      },
+    ],
+  },
 };

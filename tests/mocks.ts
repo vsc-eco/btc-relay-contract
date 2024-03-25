@@ -1,20 +1,77 @@
-import { jest, beforeEach } from "@jest/globals";
-
 //Crypto imports
 import { ripemd160, sha256 } from "bitcoinjs-lib/src/crypto";
 
+if (!globalThis.beforeEach) {
+  await import("mocha").then((Mocha) => {
+    Mocha.setup("bdd");
+    mocha.timeout(0);
+    setTimeout(() => Mocha.run(), 1000);
+  });
+}
+
+/**
+ * Raw WebAssembly Memory
+ */
 export let memory: WebAssembly.Memory;
+/**
+ * Total gas used in current test
+ */
 export let IOGas = 0;
+/**
+ * Error thrown by contract
+ */
 export let error: any;
+/**
+ * Logs printed in current test
+ */
 export let logs: string[] = [];
+/**
+ * Environment variables available to the contract
+ */
 export let contractEnv = {
   "block.included_in": null,
   "sender.id": null,
   "sender.type": null,
 };
+/**
+ * Cache for current contract state
+ */
 export let stateCache = new Map();
+/**
+ * Contract instance
+ */
+export let contract: Awaited<
+  ReturnType<typeof import("../build/debug").instantiate>
+>;
 
-export function reset() {
+async function instantiateContract<
+  R,
+  T extends {
+    instantiate(
+      module: WebAssembly.Module,
+      imports: typeof globals
+    ): Promise<R>;
+  }
+>(importPromise: Promise<T>): Promise<R> {
+  const { instantiate } = await importPromise;
+  return await (async (url) =>
+    instantiate(
+      await (async () => {
+        try {
+          return await globalThis.WebAssembly.compileStreaming(
+            globalThis.fetch(url)
+          );
+        } catch {
+          return globalThis.WebAssembly.compile(
+            await (await import("node:fs/promises")).readFile(url)
+          );
+        }
+      })(),
+      globals
+    ))(new URL("../build/debug.wasm", import.meta.url));
+}
+
+export async function reset() {
   memory = new WebAssembly.Memory({
     initial: 10,
     maximum: 128,
@@ -28,23 +85,7 @@ export function reset() {
     "sender.type": null,
   };
   stateCache.clear();
-}
-
-export function mockModules() {
-  for (let [key, value] of Object.entries(globals)) {
-    // const mock = {
-    //   __esModule: true,
-    //   default: value,
-    // };
-
-    // //@ts-ignore
-    // mock.__proto__ = value;
-
-    // if (key === "sdk") {
-    //   key = "@vsc.eco/sdk/assembly";
-    // }
-    jest.unstable_mockModule(key, () => value, { virtual: true });
-  }
+  contract = await instantiateContract(import("@@/build/debug"));
 }
 
 /**
@@ -119,8 +160,6 @@ const globals = {
       const key = keyPtr; //(insta as any).exports.__getString(keyPtr);
       const val = valPtr; //(insta as any).exports.__getString(valPtr);
 
-      console.log("db.setObject: " + key + " = " + val);
-
       IOGas = IOGas + key.length + val.length;
 
       stateCache.set(key, val);
@@ -131,7 +170,6 @@ const globals = {
       const value = stateCache.get(key);
 
       const val = value;
-      console.log("db.getObject: " + key + " = " + val);
 
       IOGas = IOGas + val.length; // Total serialized length of gas
 

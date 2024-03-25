@@ -1,14 +1,16 @@
-import { logs, mockModules, reset, stateCache } from "./mocks"; // this MUST be imported first
+import { logs, contract, reset, stateCache } from "./mocks";
 
-mockModules();
+// import { beforeEach, describe, it } from "mocha";
+import { expect } from "chai";
 
 beforeEach(reset);
 
 describe("hello-world", () => {
-  it("should pass when `to` is 'test2'", async () => {
-    const mod = await import("../build/debug");
-    expect(mod.testJSON(JSON.stringify({ to: "test2" }))).toBe("Count: 1");
-    expect(logs).toEqual([
+  it("should pass when `to` is 'test2'", () => {
+    expect(contract.testJSON(JSON.stringify({ to: "test2" }))).to.equal(
+      "Count: 1"
+    );
+    expect(logs).to.deep.equal([
       '{"to":"test2"}',
       "to",
       "to",
@@ -17,21 +19,18 @@ describe("hello-world", () => {
       "test val",
       '{"to":"test2"}',
     ]);
-    expect(stateCache.get("key-1")).toBe('{"to":"test2"}');
+    expect(stateCache.get("key-1")).to.equal('{"to":"test2"}');
   });
 
-  it("should fail when `to` is 'test1'", async () => {
-    const mod = await import("../build/debug");
-    expect(mod.testJSON).toThrow();
+  it("should fail when `to` is 'test1'", () => {
     let threw = false;
     try {
-      mod.testJSON(JSON.stringify({ to: "test1" }));
-      throw new Error("should throw");
+      contract.testJSON(JSON.stringify({ to: "test1" }));
     } catch {
       threw = true;
     }
-    expect(threw).toBe(true);
-    expect(logs).toEqual([
+    expect(threw).to.equal(true);
+    expect(logs).to.deep.equal([
       '{"to":"test1"}',
       "to",
       "to",
