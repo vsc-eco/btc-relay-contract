@@ -4,7 +4,10 @@
       "outFile": "build/debug.wasm",
       "textFile": "build/debug.wat",
       "sourceMap": true,
-      "debug": true
+      "debug": true,
+      "importMemory": true,
+      "noExportMemory": true,
+      "exportRuntime": false
     },
     "release": {
       "outFile": "build/release.wasm",
@@ -17,6 +20,6 @@
     }
   },
   "options": {
-    "bindings": "esm"
+    "bindings": "raw"
   }
 }
