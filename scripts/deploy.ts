@@ -25,6 +25,8 @@ async function main() {
   await deployContract(scriptPath);
 }
 
+const VSC_NODE_URL = process.env.VSC_NODE_HOST || "https://api.vsc.eco";
+
 const IPFS_HOST = process.env.IPFS_HOST || "/ip4/127.0.0.1/tcp/5001";
 const HIVE_API = process.env.HIVE_HOST || "https://hive-api.web3telekom.xyz";
 const VSC_NETWORK_ID =
@@ -532,7 +534,7 @@ type RawResponse = {
 };
 
 async function getEpochMembers() {
-  const res = await fetch("https://api.vsc.eco/api/v1/graphql", {
+  const res = await fetch(`${VSC_NODE_URL}/api/v1/graphql`, {
     headers: {
       accept:
         "application/graphql-response+json, application/json, multipart/mixed",
