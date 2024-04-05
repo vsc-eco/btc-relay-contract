@@ -16,6 +16,7 @@ import { BlsCircuit, BlsCircuitGenerator, decodeBase64 } from "./bls-did.js";
 import * as mktemp from "mktemp";
 import { encodePayload } from "dag-jose-utils";
 import { bech32 } from "bech32";
+import { fetch } from "cross-fetch";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
