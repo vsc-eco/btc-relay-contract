@@ -8,7 +8,7 @@ For smart contract specific functionality, use the `@vsc.eco/sdk/assembly` modul
 
 ## Scripts
 
-- `build`: compiles a release build of the smart contract
+- `deploy`: compiles & deploys a release build of the smart contract. Note: Ensure both `HIVE_ACCOUNT_USERNAME` and `HIVE_ACCOUNT_ACTIVE_PRIVATE_KEY` are set in your environment or in the `.env` file in the root of this project. They are both used to deploy the smart contract via a `custom-json` operation on Hive.
 - `asbuild:debug`: compiles a debug build of the smart contract. This is used in both test environments. For now, you need to manually compile this for code changes to reflect in tests.
 - `test`: runs the tests using `jest`. This is good for CI or running individual tests without debugging support.
 - `test:debug`: runs the tests using `mocha` & `vite`. This runs tests in the browser with sourcemap support allowing breakpoint debugging your smart contract with the original AssemblyScript source code.
@@ -17,7 +17,7 @@ For smart contract specific functionality, use the `@vsc.eco/sdk/assembly` modul
 
 - `assembly`: where your smart contract source code lives
 - `build`: where the build artifacts are placed
-- `scripts`: placeholder for future scripts
+- `scripts`: where scripts live
 - `tests`: where your tests live
 
 ### Files that should NOT be touched
@@ -34,6 +34,7 @@ These files will be moved to a separate library at some point and are not intend
 - `tests/debug.ts`
 - `tests/mocks.ts`
 - `tests/vite-env.d.ts`
+- `scripts/deploy.ts`
 
 ## Testing Apperatice
 
