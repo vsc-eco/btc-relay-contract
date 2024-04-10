@@ -2,7 +2,7 @@
   "dependencies": {
     "@assemblyscript/loader": "^0.27.22",
     "@hiveio/dhive": "^1.2.8",
-    "@vsc.eco/sdk": "^0.1.2",
+    "@vsc.eco/sdk": "^0.1.4",
     "assemblyscript": "^0.27.22",
     "assemblyscript-json": "^1.1.0",
     "asyncify-wasm": "^1.2.1",
