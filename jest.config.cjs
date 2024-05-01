@@ -6,6 +6,7 @@ module.exports = {
     "/node_modules/",
     "/tests/mocks.ts",
     "/tests/debug.ts",
+    "/tests/vite-env.d.ts",
   ],
   testEnvironment: "node",
   extensionsToTreatAsEsm: [".ts"],
