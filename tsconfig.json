@@ -5,6 +5,7 @@
         "moduleResolution": "Node",
         "paths": {
             "@@/*": ["./*"],
-        }
+        },
+        "types": ["@types/jest", "@vsc.eco/contract-testing-utils/contract", "./contract.d.ts"]
     }
 }
