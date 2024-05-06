@@ -1282,6 +1282,11 @@
   resolved "https://registry.yarnpkg.com/@stablelib/wipe/-/wipe-1.0.1.tgz#d21401f1d59ade56a62e139462a97f104ed19a36"
   integrity sha512-WfqfX/eXGiAd3RJe4VU2snh/ZPwtSjLG4ynQ/vYzvghTh7dHFcI1wl+nrkWG6lGhukOxOsUHfv8dUXr58D0ayg==
 
+"@summa-tx/bitcoin-spv-js@^4.0.2":
+  version "4.0.2"
+  resolved "https://registry.yarnpkg.com/@summa-tx/bitcoin-spv-js/-/bitcoin-spv-js-4.0.2.tgz#527664a83323d8a984d98dd84bf8bd21899e5cc4"
+  integrity sha512-VjiZDytmNvvAaYgx/Ngf3hoO2Fyrir3+nTiHWCS2XgA6a5KjgzVX2I64EaepbuD3Ib/alqi2jaqYiVJ8owQxAw==
+
 "@swc/core-darwin-arm64@1.5.3":
   version "1.5.3"
   resolved "https://registry.yarnpkg.com/@swc/core-darwin-arm64/-/core-darwin-arm64-1.5.3.tgz#37267be4dc76426073f66ca0177a10c9b1237326"
@@ -1566,11 +1571,12 @@
   dependencies:
     "@types/yargs-parser" "*"
 
-"@vsc.eco/contract-testing-utils@^0.0.4":
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/@vsc.eco/contract-testing-utils/-/contract-testing-utils-0.0.4.tgz#d97ff833edff897e4bf6b4e44e5e309b45d29631"
-  integrity sha512-I1oVrVtvsZJ4C378TStQnhCsxouaDm9VpvtrTv8P2nabv9Em2CgtsZZglSkd405SKT50gLBJVuOqQN2mLSiZaw==
+"@vsc.eco/contract-testing-utils@^0.0.6":
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/@vsc.eco/contract-testing-utils/-/contract-testing-utils-0.0.6.tgz#053d2c11457f4d6f49bc0864d87125e18c2abf31"
+  integrity sha512-QWHVYbVY/vFW/PotPWMHEHymvrmeN6e7JQp+x/fJelWakkjryF88u3z6d88521IoF+YlYwiIClAnQVMOdhbZGg==
   dependencies:
+    "@summa-tx/bitcoin-spv-js" "^4.0.2"
     assemblyscript "^0.27.27"
     bitcoinjs-lib "^6.1.5"
     mocha "^10.4.0"
