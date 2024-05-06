@@ -7,8 +7,9 @@
       "debug": true,
       "importMemory": true,
       "noExportMemory": true,
-      "exportRuntime": false,
-      "bindings": "raw"
+      "exportRuntime": true,
+      "bindings": "raw",
+      "transform": ["@vsc.eco/contract-testing-utils/debugTransform"]
     }
   }
 }

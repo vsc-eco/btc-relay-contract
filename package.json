@@ -2,9 +2,10 @@
   "dependencies": {
     "@assemblyscript/loader": "^0.27.22",
     "@hiveio/dhive": "^1.2.8",
+    "@vsc.eco/contract-testing-utils": "^0.0.4",
     "@vsc.eco/sdk": "^0.1.4",
     "as-bigint": "^0.5.3",
-    "assemblyscript": "^0.27.22",
+    "assemblyscript": "^0.27.27",
     "assemblyscript-json": "^1.1.0",
     "asyncify-wasm": "^1.2.1",
     "cli-progress": "^3.12.0",

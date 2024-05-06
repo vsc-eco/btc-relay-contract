@@ -1,7 +1,18 @@
-import { logs, contract, reset, stateCache } from "./mocks";
+import {
+  logs,
+  contract,
+  reset,
+  stateCache,
+  contractEnv,
+  setContractImport,
+} from "@vsc.eco/contract-testing-utils";
 
 // import { beforeEach, describe, it } from "mocha";
 import { expect } from "chai";
+
+const contractImport = import("../build/debug");
+
+beforeAll(() => setContractImport(contractImport));
 
 beforeEach(reset);
 
