@@ -9,7 +9,8 @@ For smart contract specific functionality, use the `@vsc.eco/sdk/assembly` modul
 ## Scripts
 
 - `deploy`: compiles & deploys a release build of the smart contract. Note: Ensure both `HIVE_ACCOUNT_USERNAME` and `HIVE_ACCOUNT_ACTIVE_PRIVATE_KEY` are set in your environment or in the `.env` file in the root of this project. They are both used to deploy the smart contract via a `custom-json` operation on Hive.
-- `asbuild:debug`: compiles a debug build of the smart contract. This is used in both test environments. For now, you need to manually compile this for code changes to reflect in tests.
+- `asbuild:debug`: compiles a debug build of the smart contract. This is used in both test environments. Used to manually compile this for the code changes to be reflectled in the tests.
+- `asbuild:debug-live`: observes the changes in the smart contract and compiles a debug build on changes. This is best used in conjunction with _test:debug_ for a small feedback loop.
 - `test`: runs the tests using `jest`. This is good for CI or running individual tests without debugging support.
 - `test:debug`: runs the tests using `mocha` & `vite`. This runs tests in the browser with sourcemap support allowing breakpoint debugging your smart contract with the original AssemblyScript source code.
 
@@ -48,3 +49,10 @@ There is a file `tests/mocks.ts`, which contains all the utilities for testing. 
 - `error`: The last error thrown by the smart contract since the last `reset()`.
 - `IOGas`: The total gas used by the smart contract since the last `reset()`.
 - `memory`: Raw WebAssembly Memory your smart contract can access. This is not persisted between contract calls and is cleared after each `reset()`.
+
+## Libraries
+
+The following libraries are supported by VSC smart contracts.
+
+- `@vsc.eco/sdk/assembly`: The VSC smart contract SDK. This library serves general purposes and provides various smart contract specific functionality.
+- `as-bigint`: A very handy [library for simple arithmetic](https://github.com/polywrap/as-bigint) with large numbers. Also useful when an operation like taking the power of a number is required (** operator), as assemblyscript does not natively support this.  
