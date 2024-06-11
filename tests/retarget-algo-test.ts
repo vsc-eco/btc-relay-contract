@@ -26,7 +26,18 @@ describe("unit test retargetAlgorithm", () => {
         retargetAlgorithmVector[i].input[2].hex
       ));
 
+      console.log("previousTarget: " + previousTarget.toString());
+      console.log("expectedNewTarget: " + expectedNewTarget.toString());
+      console.log("firstTimestamp: " + firstTimestamp.toString());
+      console.log("secondTimestamp: " + secondTimestamp.toString());
+
+      
       res = BigInt(contract.wrapperRetargetAlgorithm(previousTarget.toString(), firstTimestamp, secondTimestamp));
+      console.log(res & expectedNewTarget)
+      console.log(res)
+      console.log(expectedNewTarget)
+      // console.log("result: " + res.toString());
+      // break
       // this converts our full-length target into truncated block target
       assert.strictEqual(res & expectedNewTarget, expectedNewTarget);
 

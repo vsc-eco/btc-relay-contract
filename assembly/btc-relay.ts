@@ -379,20 +379,6 @@ export function retargetAlgorithm(previousTarget: BigInt, firstTimestamp: i64, s
     return previousTarget.mul(elapsedTime).div(rp);
 }
 
-export function reevaluateDiffTarget(header: Header): DifficultyPeriodParams {
-    const timestamp = Date.fromString(header.timestamp).getTime() / 1000;
-    const lastDifficultyPeriodParams = getLastDifficultyPeriodParams()!;
-    let retargetedDiff = retargetAlgorithm(lastDifficultyPeriodParams.difficulty, lastDifficultyPeriodParams.startTimestamp, timestamp);
-
-    // pla: in case we want to allow a 5% difference
-    // const retargetErrorMarginPercent = 5;
-    // retargetedDiff = retargetedDiff.mul(100 + retargetErrorMarginPercent).div(100)
-
-    const difficultyPeriodParams = new DifficultyPeriodParams(timestamp, retargetedDiff);
-    setLastDifficultyPeriodParams(difficultyPeriodParams);
-    return difficultyPeriodParams;
-}
-
 // pla: processHeaders only works when you start at block zero, with this function you can start at any arbitrary height
 export function initializeAtSpecificBlock(initDataString: string): void {
     const initData = parseInitData(initDataString);
@@ -535,13 +521,33 @@ export function processHeaders(processDataString: string): void {
         console.log('current height ' + blocksToPush[i].height.toString())
         console.log('current diff' + blocksToPush[i].diff.toString())
         console.log('current difficultyPeriodDiff' + difficultyPeriodParams.difficulty.toString())
-        if (blocksToPush[i].height !== 0 && blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === 0) {
+        if (blocksToPush[i].height !== 0 && blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === RETARGET_PERIOD_BLOCKS - 1) {
             console.log('initial time' + difficultyPeriodParams.startTimestamp.toString())
             console.log('initial difficulty' + difficultyPeriodParams.difficulty.toString())
-            difficultyPeriodParams = reevaluateDiffTarget(blocksToPush[i]);
+            const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
+
+            const difficulty = BigInt.fromString(db.getObject('last_difficulty_period_diff'))
+            const startTimestamp = parseInt(db.getObject('last_difficulty_period_timestamp'))
+            const lastDifficultyPeriodParams = getLastDifficultyPeriodParams()!;
+            let retargetedDiff = retargetAlgorithm(difficulty, startTimestamp, timestamp);
+            // pla: optimize for less db access
+            // if (blocksToPush.length > i + 1) {
+                db.setObject('last_difficulty_period_diff', retargetedDiff.toString());
+                db.setObject('last_difficulty_period_state', 'WAITING_FOR_TIMESTAMP');
+            // } 
+
             console.log('UPDATED difficultyPeriodDiff' + difficultyPeriodParams.difficulty.toString())
         }
-        if (blocksToPush[i].diff.lte(difficultyPeriodParams.difficulty)) {
+        if (blocksToPush[i].height === 0 && blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === 0) {
+            if (db.getObject('last_difficulty_period_state') === 'WAITING_FOR_TIMESTAMP') {
+                const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
+                db.setObject('last_difficulty_period_state', 'READY_FOR_VALIDATION');
+                db.setObject('last_difficulty_period_timestamp', timestamp.toString());
+            }
+            // const difficultyPeriodParams = new DifficultyPeriodParams(blocksToPush[i].timestamp, retargetedDiff);
+            // setLastDifficultyPeriodParams(difficultyPeriodParams);
+        }
+        if (blocksToPush[i].diff.gte(difficultyPeriodParams.difficulty)) {
             targetDiffValidatedBlocks.push(blocksToPush[i]);
             console.log('PUSHED')
         }

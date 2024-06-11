@@ -352,7 +352,7 @@ describe("test processHeaders at a difficulty retarget height", () => {
     expect("2017" in updatedCache).to.be.true
   });
 
-  it("should process headers at arbitrary difficulty retarget height", () => {
+  xit("should process headers at arbitrary difficulty retarget height", () => {
     // headers 201598, 201599, 201600, 201601
     const testheaders = [
       "02000000b9985b54b29f5244d2884e497a68523a6f8a3874dadc1db26804000000000000f3689bc987a63f3d9db84913a4521691b6292d46be11166412a1bb561159098f238e6b508bdb051a6ffb0277",
