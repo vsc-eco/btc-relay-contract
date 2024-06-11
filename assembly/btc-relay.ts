@@ -530,7 +530,15 @@ export function processHeaders(processDataString: string): void {
                 if (lastDifficultyPeriodParams.startTimestamp === 0) {
                     throw new Error('lastDifficultyPeriodParams.startTimestamp is not set. This error should never happen.');
                 }
+
+                
+
+                console.log('lastdifficulty' + lastDifficultyPeriodParams.difficulty.toString())
+                console.log('lasttimestamp' + lastDifficultyPeriodParams.startTimestamp.toString())
+                console.log('timestamp' + timestamp.toString())
                 let retargetedDiff = retargetAlgorithm(lastDifficultyPeriodParams.difficulty, lastDifficultyPeriodParams.startTimestamp, timestamp);
+                console.log('retargetedDiff' + retargetedDiff.toString())
+
                 // pla: optimize for less db access
                 // if (blocksToPush.length > i + 1) {
                     setLastDifficultyPeriodParams(new DifficultyPeriodParams(retargetedDiff, 0, blocksToPush[i].height + 1));
