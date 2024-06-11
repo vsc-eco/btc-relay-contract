@@ -16,15 +16,17 @@ const headersState: Map<string, Map<i64, string>> = new Map<string, Map<i64, str
 
 class DifficultyPeriodParams {
     startTimestamp: i64;
+    startHeight: i64;
     difficulty: BigInt;
 
-    constructor(startTimestamp: i64, difficulty: BigInt) {
+    constructor(difficulty: BigInt, startTimestamp: i64, startHeight: i64) {
         this.startTimestamp = startTimestamp;
+        this.startHeight = startHeight;
         this.difficulty = difficulty;
     }
 }
 
-const FIRST_DIFFICULTY_PERIOD_PARAMS = new DifficultyPeriodParams(1231469665, BigInt.fromString('1'));
+const FIRST_DIFFICULTY_PERIOD_PARAMS = new DifficultyPeriodParams(BigInt.fromString('1'), 1231469665, 0);
 
 // pla: for serialization and storage in the db, we convert BigInt to string and Uint8Array to hex string
 export class Header {
@@ -153,8 +155,9 @@ export function parseInitData(initDataString: string): InitData {
     let difficultyPeriodParamsJSON: JSON.Obj | null = parsed.getObj('lastDifficultyPeriodParams');
     if (difficultyPeriodParamsJSON != null) {
         const lastDifficultyPeriodParams = new DifficultyPeriodParams(
+            BigInt.fromString(getStringFromJSON(difficultyPeriodParamsJSON, 'difficulty')),
             getIntFromJSON(difficultyPeriodParamsJSON, 'startTimestamp') as i64,
-            BigInt.fromString(getStringFromJSON(difficultyPeriodParamsJSON, 'difficulty'))
+            0
         );
         initData.lastDifficultyPeriodParams = lastDifficultyPeriodParams;
     }
@@ -346,6 +349,7 @@ export function setLastDifficultyPeriodParams(defaultValue: DifficultyPeriodPara
     let encoder = new JSONEncoder();
     encoder.pushObject(null);
     encoder.setInteger("startTimestamp", defaultValue.startTimestamp);
+    encoder.setInteger("startHeight", defaultValue.startHeight);
     encoder.setString("difficulty", defaultValue.difficulty.toString());
     encoder.popObject();
     db.setObject(`last_difficulty_period_params`, encoder.toString());
@@ -355,10 +359,12 @@ export function getLastDifficultyPeriodParams(): DifficultyPeriodParams {
     const valDepthString = db.getObject(`last_difficulty_period_params`);
     if (valDepthString !== "null") {
         const parsed = <JSON.Obj>JSON.parse(valDepthString);
-        return new DifficultyPeriodParams(
+        const difficultyPeriodParams = new DifficultyPeriodParams(
+            BigInt.fromString(getStringFromJSON(parsed, 'difficulty')),
             getIntFromJSON(parsed, 'startTimestamp') as i64,
-            BigInt.fromString(getStringFromJSON(parsed, 'difficulty'))
+            getIntFromJSON(parsed, 'startHeight') as i64
         );
+        return difficultyPeriodParams;
     }
     throw new Error('When starting from a block other than 0 you need to provide the difficultyPeriodParams');
 }
@@ -492,16 +498,16 @@ export function processHeaders(processDataString: string): void {
     let blocksToPush: Array<Header> = [];
     let curDepth: i32 = 0;
     let prevBlock: Uint8Array | null = null;
-    
+
     while (true) {
         if (!prevBlock) {
             prevBlock = topHeader;
         }
-        
+
         let prevBlockStr = Arrays.toHexString(prevBlock);
         if (preheaders.has(prevBlockStr)) {
             let currentHeader = preheaders.get(prevBlockStr);
-            
+
             // pla: skipping last x blocks below validity_depth            
             if (curDepth >= validityDepth) {
                 blocksToPush.push(currentHeader);
@@ -513,46 +519,34 @@ export function processHeaders(processDataString: string): void {
             break;
         }
     }
-    
-    let difficultyPeriodParams: DifficultyPeriodParams = getLastDifficultyPeriodParams();
+
+    let lastDifficultyPeriodParams: DifficultyPeriodParams = getLastDifficultyPeriodParams();
     const targetDiffValidatedBlocks: Array<Header> = [];
     for (let i = blocksToPush.length - 1; i >= 0; i--) {
-        console.log('---------------------')
-        console.log('current height ' + blocksToPush[i].height.toString())
-        console.log('current diff' + blocksToPush[i].diff.toString())
-        console.log('current difficultyPeriodDiff' + difficultyPeriodParams.difficulty.toString())
-        if (blocksToPush[i].height !== 0 && blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === RETARGET_PERIOD_BLOCKS - 1) {
-            console.log('initial time' + difficultyPeriodParams.startTimestamp.toString())
-            console.log('initial difficulty' + difficultyPeriodParams.difficulty.toString())
-            const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
-
-            const difficulty = BigInt.fromString(db.getObject('last_difficulty_period_diff'))
-            const startTimestamp = parseInt(db.getObject('last_difficulty_period_timestamp'))
-            const lastDifficultyPeriodParams = getLastDifficultyPeriodParams()!;
-            let retargetedDiff = retargetAlgorithm(difficulty, startTimestamp, timestamp);
-            // pla: optimize for less db access
-            // if (blocksToPush.length > i + 1) {
-                db.setObject('last_difficulty_period_diff', retargetedDiff.toString());
-                db.setObject('last_difficulty_period_state', 'WAITING_FOR_TIMESTAMP');
-            // } 
-
-            console.log('UPDATED difficultyPeriodDiff' + difficultyPeriodParams.difficulty.toString())
-        }
-        if (blocksToPush[i].height === 0 && blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === 0) {
-            if (db.getObject('last_difficulty_period_state') === 'WAITING_FOR_TIMESTAMP') {
+        if (blocksToPush[i].height !== 0) {
+            if (blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === RETARGET_PERIOD_BLOCKS - 1) {
                 const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
-                db.setObject('last_difficulty_period_state', 'READY_FOR_VALIDATION');
-                db.setObject('last_difficulty_period_timestamp', timestamp.toString());
+                lastDifficultyPeriodParams = getLastDifficultyPeriodParams()!;
+                if (lastDifficultyPeriodParams.startTimestamp === 0) {
+                    throw new Error('lastDifficultyPeriodParams.startTimestamp is not set. This error should never happen.');
+                }
+                let retargetedDiff = retargetAlgorithm(lastDifficultyPeriodParams.difficulty, lastDifficultyPeriodParams.startTimestamp, timestamp);
+                // pla: optimize for less db access
+                // if (blocksToPush.length > i + 1) {
+                    setLastDifficultyPeriodParams(new DifficultyPeriodParams(retargetedDiff, 0, blocksToPush[i].height + 1));
+                // }
             }
-            // const difficultyPeriodParams = new DifficultyPeriodParams(blocksToPush[i].timestamp, retargetedDiff);
-            // setLastDifficultyPeriodParams(difficultyPeriodParams);
+            if (lastDifficultyPeriodParams.startHeight === blocksToPush[i].height) {
+                const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
+                lastDifficultyPeriodParams = new DifficultyPeriodParams(lastDifficultyPeriodParams.difficulty, timestamp, lastDifficultyPeriodParams.startHeight)
+                setLastDifficultyPeriodParams(lastDifficultyPeriodParams);
+            }
         }
-        if (blocksToPush[i].diff.gte(difficultyPeriodParams.difficulty)) {
+        if (blocksToPush[i].diff.gte(lastDifficultyPeriodParams.difficulty)) {
             targetDiffValidatedBlocks.push(blocksToPush[i]);
-            console.log('PUSHED')
         }
-        console.log('---------------------')
     }
+
 
     let highestHeight = 0;
     for (let i = 0, k = targetDiffValidatedBlocks.length; i < k; ++i) {
