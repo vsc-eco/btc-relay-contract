@@ -8,6 +8,8 @@ const DIFF_ONE_TARGET = BigInt.fromString('0xffff0000000000000000000000000000000
 
 const MAX_DIFFICULTY = BigInt.fromString("0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
+const FIRST_DIFFICULTY_PERIOD_HEADER = "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c";
+
 const DEFAULT_VALIDITY_DEPTH = 6;
 
 const RETARGET_PERIOD = BigInt.from(1209600);
@@ -27,8 +29,6 @@ class DifficultyPeriodParams {
         this.difficulty = difficulty;
     }
 }
-
-const FIRST_DIFFICULTY_PERIOD_PARAMS = new DifficultyPeriodParams(BigInt.fromString('26959535291011309493156476344723991336010898738574164086137773096960'), 1231006505);
 
 // pla: for serialization and storage in the db, we convert BigInt to string and Uint8Array to hex string
 export class Header {
@@ -79,7 +79,7 @@ export class InitData {
     startHeader: string;
     height: i32;
     previousDifficulty: BigInt;
-    lastDifficultyPeriodParams: DifficultyPeriodParams | null = null;
+    lastDifficultyPeriodRetargetBlock: string | null = null;
     // pla: directs how many blocks to skip from the end of the chain, 0 no blocks are skipped
     // default validity depth is 6 blocks, this means we skip the last 6 blocks from the end of the chain, because we cant assume that they are final yet
     validityDepth: i32 = DEFAULT_VALIDITY_DEPTH;
@@ -159,15 +159,11 @@ export function parseInitData(initDataString: string): InitData {
         initData.validityDepth = validityDepthJSON.valueOf() as i32
     }
 
-    let difficultyPeriodParamsJSON: JSON.Obj | null = parsed.getObj('lastDifficultyPeriodParams');
-    if (difficultyPeriodParamsJSON != null) {
-        const lastDifficultyPeriodParams = new DifficultyPeriodParams(
-            BigInt.fromString(getStringFromJSON(difficultyPeriodParamsJSON, 'difficulty')),
-            getIntFromJSON(difficultyPeriodParamsJSON, 'startTimestamp') as i64
-        );
-        initData.lastDifficultyPeriodParams = lastDifficultyPeriodParams;
+    let lastDifficultyPeriodRetargetBlockJSON: JSON.Str | null = parsed.getString('lastDifficultyPeriodRetargetBlock');
+    if (lastDifficultyPeriodRetargetBlockJSON != null) {
+        initData.lastDifficultyPeriodRetargetBlock = lastDifficultyPeriodRetargetBlockJSON.valueOf();
     }
-
+    
     return initData;
 }
 
@@ -371,7 +367,7 @@ export function getLastDifficultyPeriodParams(): DifficultyPeriodParams {
         );
         return difficultyPeriodParams;
     }
-    throw new Error('When starting from a block other than 0 you need to provide the difficultyPeriodParams');
+    throw new Error('When starting from a block other than 0 you need to provide the lastDifficultyPeriodRetargetBlock');
 }
 
 // retarget algo implementation of https://github.com/bitcoin/bitcoin/blob/master/src/pow.cpp#L49
@@ -396,21 +392,32 @@ export function retargetAlgorithm(previousTarget: BigInt, firstTimestamp: i64, s
     return retargetedDiff;
 }
 
-// pla: processHeaders only works when you start at block zero, with this function you can start at any arbitrary height
+export function convertHeaderToDifficultyPeriodParams(header: string): DifficultyPeriodParams {
+    const decodeHex = Arrays.fromHexString(header);
+    const timestamp = extractTimestamp(decodeHex);
+    const diffUnformatted = extractTarget(decodeHex);
+
+    return new DifficultyPeriodParams(diffUnformatted, timestamp);
+}
+
+// pla: processHeaders only works when you start at block zero, with this function you can start at any arbitrary height, 
+// there probably more optimal ways to do this without initializing the preheaders with a block, but this should be sufficient for now
 export function initializeAtSpecificBlock(initDataString: string): void {
     const initData = parseInitData(initDataString);
 
     if (db.getObject(`pre-headers/main`) === "null") {
         getValidityDepth(initData.validityDepth);
-        if (initData.lastDifficultyPeriodParams !== null) {
-            setLastDifficultyPeriodParams(initData.lastDifficultyPeriodParams!);
+        let lastDifficultyPeriodRetargetBlock: string;
+        if (initData.lastDifficultyPeriodRetargetBlock !== null) {
+            lastDifficultyPeriodRetargetBlock = initData.lastDifficultyPeriodRetargetBlock!;
         } else {
             if (initData.height < RETARGET_PERIOD_BLOCKS) {
-                setLastDifficultyPeriodParams(FIRST_DIFFICULTY_PERIOD_PARAMS)
+                lastDifficultyPeriodRetargetBlock = FIRST_DIFFICULTY_PERIOD_HEADER;
             } else {
-                throw new Error('Please supply difficultyPeriodParams when you start with a block height higher than the first retarget period');
+                throw new Error('Please supply lastDifficultyPeriodRetargetBlock when you start with a block height higher than the first retarget period');
             }
         }
+        setLastDifficultyPeriodParams(convertHeaderToDifficultyPeriodParams(lastDifficultyPeriodRetargetBlock))
 
         const decodeHex = Arrays.fromHexString(initData.startHeader);
         const prevBlockLE = extractPrevBlockLE(decodeHex);
@@ -472,7 +479,7 @@ export function processHeaders(processDataString: string): void {
 
         if (prevBlockStr === '0000000000000000000000000000000000000000000000000000000000000000') {
             prevHeight = -1;
-            setLastDifficultyPeriodParams(FIRST_DIFFICULTY_PERIOD_PARAMS)
+            setLastDifficultyPeriodParams(new DifficultyPeriodParams(diffUnformatted, timestamp));
         } else {
             if (preheaders.has(prevBlockStr)) {
                 let blockInfo = preheaders.get(prevBlockStr);
