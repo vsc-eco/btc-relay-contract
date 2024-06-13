@@ -214,7 +214,7 @@ xdescribe("test processHeaders with many headers", () => {
   });
 });
 
-xdescribe("test processHeaders with existing state", () => {
+describe("test processHeaders with existing state", () => {
   it("should be able to process headers that dont start at block zero via existing state", () => {
     // arrange
     const preheaders5to7 = {
@@ -334,7 +334,7 @@ xdescribe("test processHeaders with existing state", () => {
 });
 
 describe("test processHeaders at a difficulty retarget height", () => {
-  xit("should process headers at first difficulty retarget height", () => {
+  it("should process headers at first difficulty retarget height", () => {
     // headers 2015, 2016, 2017
     const testheaders = [
       "01000000e25509cde707c3d02a693e4fe9e7cdd57c38a0d2c8d6341f20dae84b000000000c113df1185e162ee92d031fe21d1400ff7d705a3e9b9c860eea855313cd8ca26c087f49ffff001d30b73231",
@@ -347,6 +347,7 @@ describe("test processHeaders at a difficulty retarget height", () => {
 
     // assert
     const updatedCache = JSON.parse(stateCache.get("headers/2000-2100"))
+    console.log(updatedCache)
     expect("2015" in updatedCache).to.be.true
     expect("2016" in updatedCache).to.be.true
     expect("2017" in updatedCache).to.be.true
@@ -367,35 +368,31 @@ describe("test processHeaders at a difficulty retarget height", () => {
       validityDepth: 0,
       lastDifficultyPeriodParams: {
         startTimestamp: 1348092851,
-        difficulty: "2864140"
+        difficulty: "9412783771427520201810837309176674245361798887059324066070528"
       }
     });
     const processData = JSON.stringify({
       headers: testheaders.slice(1)
     });
-
     // act
     contract.initializeAtSpecificBlock(initData);
     contract.processHeaders(processData);
 
     // assert
     const updatedCache500to600 = JSON.parse(stateCache.get("headers/201500-201600"))
-    // const updatedCache600To700 = JSON.parse(stateCache.get("headers/201600-201700"))
-    console.log(updatedCache500to600)
-    // console.log(updatedCache600To700)
+    const updatedCache600To700 = JSON.parse(stateCache.get("headers/201600-201700"))
     expect("201598" in updatedCache500to600).to.be.true
     expect("201599" in updatedCache500to600).to.be.true
-    // expect("201600" in updatedCache600To700).to.be.true
-    // expect("201601" in updatedCache600To700).to.be.true
+    expect("201600" in updatedCache600To700).to.be.true
+    expect("201601" in updatedCache600To700).to.be.true
 
-    // pla, WRONG EXPECTED PARAMS!
     const updatedDifficultyParams = stateCache.get("last_difficulty_period_params")
-    console.log("updated difficulty params " + JSON.stringify(updatedDifficultyParams, null, 2))
-    // const expectedDifficultyParams = JSON.stringify({
-    //   startTimestamp: 1349226660, // TIMESTAMP OF BLOCK 201600
-    //   difficulty: "3054627"
-    // })
-    // expect(updatedDifficultyParams).to.equal(expectedDifficultyParams)
+    const expectedDifficultyParams = JSON.stringify({
+      startTimestamp: 1349226660, // TIMESTAMP OF BLOCK 201600
+      endTimestamp: 0,
+      difficulty: "8825807680257895657479991196220989276506275995152177228848553"
+    })
+    expect(updatedDifficultyParams).to.equal(expectedDifficultyParams)
   });
 });
 
@@ -405,7 +402,11 @@ function executeProcessHeaders(contract: any, headers: Array<string>, startHeigh
     startHeader: headers[0],
     height: startHeight,
     previousDifficulty: previousDifficulty,
-    validityDepth: validityDepth
+    validityDepth: validityDepth,
+    lastDifficultyPeriodParams: {
+      startTimestamp: 1231006505,
+      difficulty: "26959535291011309493156476344723991336010898738574164086137773096960"
+    }
   });
 
   contract.initializeAtSpecificBlock(initData);

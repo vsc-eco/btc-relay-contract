@@ -6,6 +6,8 @@ import { Value } from 'assemblyscript-json/assembly/JSON';
 
 const DIFF_ONE_TARGET = BigInt.fromString('0xffff0000000000000000000000000000000000000000000000000000');
 
+const MAX_DIFFICULTY = BigInt.fromString("0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
 const DEFAULT_VALIDITY_DEPTH = 6;
 
 const RETARGET_PERIOD = BigInt.from(1209600);
@@ -16,17 +18,17 @@ const headersState: Map<string, Map<i64, string>> = new Map<string, Map<i64, str
 
 class DifficultyPeriodParams {
     startTimestamp: i64;
-    startHeight: i64;
+    endTimestamp: i64;
     difficulty: BigInt;
 
-    constructor(difficulty: BigInt, startTimestamp: i64, startHeight: i64) {
+    constructor(difficulty: BigInt, startTimestamp: i64, endTimestamp: i64 = 0) {
         this.startTimestamp = startTimestamp;
-        this.startHeight = startHeight;
+        this.endTimestamp = endTimestamp;
         this.difficulty = difficulty;
     }
 }
 
-const FIRST_DIFFICULTY_PERIOD_PARAMS = new DifficultyPeriodParams(BigInt.fromString('1'), 1231469665, 0);
+const FIRST_DIFFICULTY_PERIOD_PARAMS = new DifficultyPeriodParams(BigInt.fromString('26959535291011309493156476344723991336010898738574164086137773096960'), 1231006505);
 
 // pla: for serialization and storage in the db, we convert BigInt to string and Uint8Array to hex string
 export class Header {
@@ -34,6 +36,7 @@ export class Header {
     timestamp: string;
     merkleRoot: Uint8Array;
     diff: BigInt;
+    diffUnformatted: BigInt;
     totalDiff: BigInt;
     height: i32;
     raw: string;
@@ -43,6 +46,7 @@ export class Header {
         timestamp: string,
         merkleRoot: Uint8Array,
         diff: BigInt,
+        diffUnformatted: BigInt,
         totalDiff: BigInt,
         height: i32,
         raw: string
@@ -51,6 +55,7 @@ export class Header {
         this.timestamp = timestamp;
         this.merkleRoot = merkleRoot;
         this.diff = diff;
+        this.diffUnformatted = diffUnformatted;
         this.totalDiff = totalDiff;
         this.height = height;
         this.raw = raw;
@@ -62,6 +67,7 @@ export class Header {
         encoder.setString("timestamp", this.timestamp);
         encoder.setString("merkleRoot", Arrays.toHexString(this.merkleRoot));
         encoder.setString("diff", this.diff.toString());
+        encoder.setString("diffUnformatted", this.diffUnformatted.toString());
         encoder.setString("totalDiff", this.totalDiff.toString());
         encoder.setInteger("height", this.height);
         encoder.setString("raw", this.raw);
@@ -117,6 +123,7 @@ export function getPreheaders(): Map<string, Header> {
                     getStringFromJSON(<JSON.Obj>obj, "timestamp"),
                     Arrays.fromHexString(getStringFromJSON(<JSON.Obj>obj, "merkleRoot")),
                     BigInt.from(getStringFromJSON(<JSON.Obj>obj, "diff")),
+                    BigInt.from(getStringFromJSON(<JSON.Obj>obj, "diffUnformatted")),
                     BigInt.from(getStringFromJSON(<JSON.Obj>obj, "totalDiff")),
                     getIntFromJSON(<JSON.Obj>obj, "height") as i32,
                     getStringFromJSON(<JSON.Obj>obj, "raw")
@@ -156,8 +163,7 @@ export function parseInitData(initDataString: string): InitData {
     if (difficultyPeriodParamsJSON != null) {
         const lastDifficultyPeriodParams = new DifficultyPeriodParams(
             BigInt.fromString(getStringFromJSON(difficultyPeriodParamsJSON, 'difficulty')),
-            getIntFromJSON(difficultyPeriodParamsJSON, 'startTimestamp') as i64,
-            0
+            getIntFromJSON(difficultyPeriodParamsJSON, 'startTimestamp') as i64
         );
         initData.lastDifficultyPeriodParams = lastDifficultyPeriodParams;
     }
@@ -314,7 +320,6 @@ export function serializePreHeaders(preheaders: Map<string, Header>): string {
         }
     }
     encoder.popObject();
-
     return encoder.toString();
 }
 
@@ -349,7 +354,7 @@ export function setLastDifficultyPeriodParams(defaultValue: DifficultyPeriodPara
     let encoder = new JSONEncoder();
     encoder.pushObject(null);
     encoder.setInteger("startTimestamp", defaultValue.startTimestamp);
-    encoder.setInteger("startHeight", defaultValue.startHeight);
+    encoder.setInteger("endTimestamp", defaultValue.endTimestamp);
     encoder.setString("difficulty", defaultValue.difficulty.toString());
     encoder.popObject();
     db.setObject(`last_difficulty_period_params`, encoder.toString());
@@ -362,13 +367,14 @@ export function getLastDifficultyPeriodParams(): DifficultyPeriodParams {
         const difficultyPeriodParams = new DifficultyPeriodParams(
             BigInt.fromString(getStringFromJSON(parsed, 'difficulty')),
             getIntFromJSON(parsed, 'startTimestamp') as i64,
-            getIntFromJSON(parsed, 'startHeight') as i64
+            getIntFromJSON(parsed, 'endTimestamp') as i64
         );
         return difficultyPeriodParams;
     }
     throw new Error('When starting from a block other than 0 you need to provide the difficultyPeriodParams');
 }
 
+// retarget algo implementation of https://github.com/bitcoin/bitcoin/blob/master/src/pow.cpp#L49
 export function retargetAlgorithm(previousTarget: BigInt, firstTimestamp: i64, secondTimestamp: i64): BigInt {
     let elapsedTime: BigInt = BigInt.from((secondTimestamp - firstTimestamp) as i64);
     const rp: BigInt = RETARGET_PERIOD;
@@ -382,7 +388,12 @@ export function retargetAlgorithm(previousTarget: BigInt, firstTimestamp: i64, s
         elapsedTime = upperBound;
     }
 
-    return previousTarget.mul(elapsedTime).div(rp);
+    let retargetedDiff = previousTarget.mul(elapsedTime).div(rp)
+
+    if (retargetedDiff > MAX_DIFFICULTY)
+        retargetedDiff = MAX_DIFFICULTY;
+
+    return retargetedDiff;
 }
 
 // pla: processHeaders only works when you start at block zero, with this function you can start at any arbitrary height
@@ -409,12 +420,14 @@ export function initializeAtSpecificBlock(initDataString: string): void {
         const merkleRoot = reverseEndianness(extractMerkleRootLE(decodeHex));
         const headerHash = hash256(decodeHex);
         const diff = validateHeaderChain(decodeHex);
+        const diffUnformatted = extractTarget(decodeHex);
 
         const decodedHeader = new Header(
             prevBlock,
             new Date(timestamp * 1000).toISOString(),
             merkleRoot,
             diff,
+            diffUnformatted,
             diff.add(initData.previousDifficulty),
             initData.height,
             initData.startHeader
@@ -449,6 +462,7 @@ export function processHeaders(processDataString: string): void {
         const merkleRoot = reverseEndianness(extractMerkleRootLE(decodeHex));
         const headerHash = hash256(decodeHex);
         const diff = validateHeaderChain(decodeHex);
+        const diffUnformatted = extractTarget(decodeHex);
 
         let prevDiff: BigInt = BigInt.from(0);
         let prevHeight: i32 = 0;
@@ -483,6 +497,7 @@ export function processHeaders(processDataString: string): void {
                 new Date(timestamp * 1000).toISOString(),
                 merkleRoot,
                 diff,
+                diffUnformatted,
                 diff.add(prevDiff),
                 currentHeight,
                 rawBH
@@ -521,36 +536,25 @@ export function processHeaders(processDataString: string): void {
     }
 
     let lastDifficultyPeriodParams: DifficultyPeriodParams = getLastDifficultyPeriodParams();
+    if (lastDifficultyPeriodParams.startTimestamp === 0) {
+        throw new Error('lastDifficultyPeriodParams.startTimestamp is not set. This error should never happen.');
+    }
     const targetDiffValidatedBlocks: Array<Header> = [];
     for (let i = blocksToPush.length - 1; i >= 0; i--) {
         if (blocksToPush[i].height !== 0) {
             if (blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === RETARGET_PERIOD_BLOCKS - 1) {
                 const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
-                lastDifficultyPeriodParams = getLastDifficultyPeriodParams()!;
-                if (lastDifficultyPeriodParams.startTimestamp === 0) {
-                    throw new Error('lastDifficultyPeriodParams.startTimestamp is not set. This error should never happen.');
-                }
-
-                
-
-                console.log('lastdifficulty' + lastDifficultyPeriodParams.difficulty.toString())
-                console.log('lasttimestamp' + lastDifficultyPeriodParams.startTimestamp.toString())
-                console.log('timestamp' + timestamp.toString())
-                let retargetedDiff = retargetAlgorithm(lastDifficultyPeriodParams.difficulty, lastDifficultyPeriodParams.startTimestamp, timestamp);
-                console.log('retargetedDiff' + retargetedDiff.toString())
-
-                // pla: optimize for less db access
-                // if (blocksToPush.length > i + 1) {
-                    setLastDifficultyPeriodParams(new DifficultyPeriodParams(retargetedDiff, 0, blocksToPush[i].height + 1));
-                // }
+                lastDifficultyPeriodParams.endTimestamp = timestamp;
+                setLastDifficultyPeriodParams(lastDifficultyPeriodParams);
             }
-            if (lastDifficultyPeriodParams.startHeight === blocksToPush[i].height) {
-                const timestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
-                lastDifficultyPeriodParams = new DifficultyPeriodParams(lastDifficultyPeriodParams.difficulty, timestamp, lastDifficultyPeriodParams.startHeight)
+            if (blocksToPush[i].height % RETARGET_PERIOD_BLOCKS === 0) {
+                let retargetedDiff = retargetAlgorithm(lastDifficultyPeriodParams.difficulty, lastDifficultyPeriodParams.startTimestamp, lastDifficultyPeriodParams.endTimestamp);
+                const currentTimestamp = Date.fromString(blocksToPush[i].timestamp).getTime() / 1000;
+                lastDifficultyPeriodParams = new DifficultyPeriodParams(retargetedDiff, currentTimestamp, 0)
                 setLastDifficultyPeriodParams(lastDifficultyPeriodParams);
             }
         }
-        if (blocksToPush[i].diff.gte(lastDifficultyPeriodParams.difficulty)) {
+        if (lastDifficultyPeriodParams.difficulty.bitwiseAnd(blocksToPush[i].diffUnformatted).toString() === blocksToPush[i].diffUnformatted.toString()) {
             targetDiffValidatedBlocks.push(blocksToPush[i]);
         }
     }
